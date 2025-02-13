@@ -4,7 +4,6 @@ from gym import spaces
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
-from stable_baselines3 import PPO
 
 # ---------------------------------------------------------------------------
 # Drone dynamics implementation
