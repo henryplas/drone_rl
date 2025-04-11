@@ -1,4 +1,4 @@
-import DroneGymEnv
+from drone import DroneGymEnv
 from stable_baselines3 import PPO
 
 # Create the Gym environment.
