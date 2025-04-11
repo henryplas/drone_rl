@@ -1,11 +1,14 @@
-I'd like to create a simulation for modelling drone behavior. I will make a YAML-style specification for the features I'd like it to have.
-
-SPECIFICATION:
 - Drone Sim
   - Written in Python
     - Using matplotlib and numpy would be nice, but if there is a better tool for the job use it
   - Plot 3 Axes (X, Y, Z) with respect to time
     - Main view is plotted isometrically (3D view) and one view from each perspective: XY, YZ, XZ
+  - Config File Handler:
+    - Loads/saves configuration via JSON file
+  - Provide a choice of input states:
+    - Travel in circle on XY plane
+    - Bob up and down on Z plane
+    - Spiral up and down on Z plane
   - Have some parameters easily modifiable on the GUI
     - Gravity
     - Number of propellers
