@@ -6,7 +6,7 @@ matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 
 # ---------------------------------------------------------------------------
-# Drone dynamics implementation
+# Drone dynamics implementation with motor force inputs
 # ---------------------------------------------------------------------------
 class DroneEnv:
     def __init__(self, dt=0.02):
@@ -19,6 +19,10 @@ class DroneEnv:
 
         # For drawing: arm length for the X shape (distance from center to each motor)
         self.arm_length = 0.5
+        
+        # Yaw moment coefficient: maps differential motor forces to yaw torque.
+        # Adjust this constant as needed.
+        self.k_yaw = 0.01
 
         # Desired target waypoint (for example, hover at z = 10)
         self.target = np.array([0.0, 0.0, 10.0])
@@ -38,7 +42,7 @@ class DroneEnv:
           - euler: [roll, pitch, yaw] angles (rad)
           - omega: [p, q, r] angular velocity (rad/s)
         """
-        self.pos = np.array([0.1,0.1,0.1])
+        self.pos = np.array([0.1, 0.1, 0.1])
         self.vel = np.zeros(3)
         self.euler = np.zeros(3)
         self.omega = np.zeros(3)
@@ -54,16 +58,37 @@ class DroneEnv:
         Updates the state given an action.
         
         Parameters:
-          action: np.array with 4 elements:
-                  [thrust, tau_phi, tau_theta, tau_psi]
-                  
+          action: np.array with 4 elements representing the forces (in Newtons) produced by each motor:
+                  [F1, F2, F3, F4]
+          Note: It is assumed that motor forces act along the drone's body z-axis.
+                The mapping to total thrust and body torques is given by:
+                   Total thrust: F_total = F1 + F2 + F3 + F4
+                   Roll torque (tau_phi):    L/sqrt2 * (F1 + F2 - F3 - F4)
+                   Pitch torque (tau_theta): L/sqrt2 * (-F1 + F2 + F3 - F4)
+                   Yaw torque (tau_psi):     k_yaw * (F1 - F2 + F3 - F4)
+        
         Returns:
           obs: next state observation
-          reward: negative Euclidean distance from target
+          reward: negative Euclidean distance from target (with extra bonus when near the target)
           done: boolean indicating termination (if drone crashes or drifts too far)
           info: additional info (empty dict)
         """
-        thrust, tau_phi, tau_theta, tau_psi = action
+        # Interpret action as individual motor forces.
+        motor_forces = action  # [F1, F2, F3, F4]
+
+        # Compute net thrust and torques
+        thrust = np.sum(motor_forces)
+        # Using the motor positions defined in render() (X configuration):
+        # Motor offsets in body frame:
+        # Motor 1:  [L/sqrt2,  L/sqrt2, 0]
+        # Motor 2:  [-L/sqrt2, L/sqrt2, 0]
+        # Motor 3:  [-L/sqrt2, -L/sqrt2, 0]
+        # Motor 4:  [L/sqrt2,  -L/sqrt2, 0]
+        L = self.arm_length
+        factor = L / np.sqrt(2)
+        tau_phi = factor * (motor_forces[0] + motor_forces[1] - motor_forces[2] - motor_forces[3])
+        tau_theta = factor * (-motor_forces[0] + motor_forces[1] + motor_forces[2] - motor_forces[3])
+        tau_psi = self.k_yaw * (motor_forces[0] - motor_forces[1] + motor_forces[2] - motor_forces[3])
 
         # Compute rotation matrix from body to inertial frame.
         R = self._rotation_matrix(self.euler)
@@ -87,12 +112,14 @@ class DroneEnv:
         omega_dot[2] = (tau_psi - (self.I[0] - self.I[1]) * self.omega[0] * self.omega[1]) / self.I[2]
         self.omega += omega_dot * self.dt
 
-        # Reward: negative distance from the target
+        # Reward: negative distance from the target (plus bonus if near target)
         reward = 0.01 * -np.linalg.norm(self.pos - self.target) 
         if np.linalg.norm(self.pos - self.target) < 1:
             reward += 1
+
         # Terminate if the drone "crashes" (z < 0) or drifts too far from the origin.
         done = self.pos[2] < 0 or np.linalg.norm(self.pos) > 50
+        self.current_step += 1
         if self.current_step >= self.max_steps:
             done = True
         info = {}
@@ -186,10 +213,11 @@ class DroneGymEnv(DroneEnv, gym.Env):
         gym.Env.__init__(self)
         # Observation: [pos(3), vel(3), euler(3), omega(3)]
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(12,), dtype=np.float32)
-        # Action: [thrust, tau_phi, tau_theta, tau_psi]
-        action_low = np.array([0, -1, -1, -1], dtype=np.float32)
-        action_high = np.array([3 * self.mass * self.g, 1, 1, 1], dtype=np.float32)
-        self.action_space = spaces.Box(low=action_low, high=action_high, dtype=np.float32)
+        # Action: now each element is the force from each motor.
+        # For this example, we assume each motor's force is between 0 and 3*mass*g/4,
+        # so that the maximum total force is 3*mass*g.
+        motor_max = 3 * self.mass * self.g / 4.0
+        self.action_space = spaces.Box(low=0, high=motor_max, shape=(4,), dtype=np.float32)
 
     def step(self, action):
         return super().step(action)
@@ -201,7 +229,9 @@ class DroneGymEnv(DroneEnv, gym.Env):
         return super().render()
 
 
+# ---------------------------------------------------------------------------
 # Example usage:
+# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     env = DroneEnv()
     obs = env.reset()
@@ -211,8 +241,11 @@ if __name__ == "__main__":
     ax = fig.add_subplot(111, projection='3d')
     
     for _ in range(300):
-        # Example action: constant thrust to counteract gravity (hover).
-        action = np.array([env.mass * env.g * 2, 0, 0, 0])
+        # For a hovering condition the total thrust required is mass * g.
+        # With four motors, each motor should provide (mass*g)/4 for hover.
+        # Here we apply a constant force slightly above hover conditions (e.g. 2 times hover force distributed across motors).
+        hover_force_per_motor = (env.mass * env.g) / 4.0
+        action = np.full(4, hover_force_per_motor * 2)
         obs, reward, done, info = env.step(action)
         
         env.render(ax=ax)
