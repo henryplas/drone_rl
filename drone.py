@@ -23,6 +23,9 @@ class DroneEnv:
         # Desired target waypoint (for example, hover at z = 10)
         self.target = np.array([0.0, 0.0, 10.0])
         
+        # Maximum steps per episode (added for longer episodes)
+        self.max_steps = 1000
+
         # Initialize state
         self.reset()
 
@@ -35,10 +38,11 @@ class DroneEnv:
           - euler: [roll, pitch, yaw] angles (rad)
           - omega: [p, q, r] angular velocity (rad/s)
         """
-        self.pos = np.zeros(3)
+        self.pos = np.array([0.1,0.1,0.1])
         self.vel = np.zeros(3)
         self.euler = np.zeros(3)
         self.omega = np.zeros(3)
+        self.current_step = 0
         return self._get_obs()
 
     def _get_obs(self):
@@ -84,9 +88,13 @@ class DroneEnv:
         self.omega += omega_dot * self.dt
 
         # Reward: negative distance from the target
-        reward = -np.linalg.norm(self.pos - self.target)
+        reward = 0.01 * -np.linalg.norm(self.pos - self.target) 
+        if np.linalg.norm(self.pos - self.target) < 1:
+            reward += 1
         # Terminate if the drone "crashes" (z < 0) or drifts too far from the origin.
         done = self.pos[2] < 0 or np.linalg.norm(self.pos) > 50
+        if self.current_step >= self.max_steps:
+            done = True
         info = {}
         return self._get_obs(), reward, done, info
 
@@ -180,7 +188,7 @@ class DroneGymEnv(DroneEnv, gym.Env):
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(12,), dtype=np.float32)
         # Action: [thrust, tau_phi, tau_theta, tau_psi]
         action_low = np.array([0, -1, -1, -1], dtype=np.float32)
-        action_high = np.array([2 * self.mass * self.g, 1, 1, 1], dtype=np.float32)
+        action_high = np.array([3 * self.mass * self.g, 1, 1, 1], dtype=np.float32)
         self.action_space = spaces.Box(low=action_low, high=action_high, dtype=np.float32)
 
     def step(self, action):
