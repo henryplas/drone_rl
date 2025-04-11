@@ -871,7 +871,6 @@ def animate(frame):
         sim_time += DT
 
         # --- Store History ---
-        # Only store if state is valid
         if np.all(np.isfinite(drone.pos)) and np.all(np.isfinite(controller.target_pos)):
             history_pos.append(drone.pos.copy())
             history_target.append(controller.target_pos.copy())
@@ -888,10 +887,8 @@ def animate(frame):
         hist_np = np.array(history_pos)
         target_pos_current = controller.target_pos
 
-        # Check if history is valid before plotting
         if hist_np.size == 0 or not np.all(np.isfinite(hist_np)):
              print("History is empty or invalid, skipping plot update.")
-             # Optionally clear plots or just return existing artists
              return (line3d, point3d, target3d, line_xy, point_xy, target_xy,
                      line_yz, point_yz, target_yz, line_xz, point_xz, target_xz)
 
@@ -914,12 +911,13 @@ def animate(frame):
 
         line_xz.set_data(hist_np[:, 0], hist_np[:, 2])
         point_xz.set_data([drone.pos[0]], [drone.pos[2]])
-        if np.all(np.isfinite(target_pos_current)): target_xz.set_data([target_pos_current[0]], [target_pos_current[1]]) # Z-axis typo fixed here
+        # --- CORRECTED LINE BELOW ---
+        if np.all(np.isfinite(target_pos_current)): target_xz.set_data([target_pos_current[0]], [target_pos_current[2]]) # Use index 2 for Z
 
         return (line3d, point3d, target3d,
                 line_xy, point_xy, target_xy,
                 line_yz, point_yz, target_yz,
-                line_xz, point_xz, target_xz)
+                line_xz, point_xz, target_xz) # Ensure target_xz is returned
 
     except Exception as e:
         print(f"\n--- CRITICAL ERROR IN ANIMATION LOOP ---")
@@ -930,10 +928,8 @@ def animate(frame):
         traceback.print_exc()
         print("-----------------------------------------")
         print("Animation stopped due to error.")
-        animation_running = False # Stop the animation loop
-        # Optionally, re-raise the exception if you want the program to fully halt
-        # raise e
-        return [] # Return empty list of artists
+        animation_running = False
+        return []
 
 # ---- Run Animation ----
 # Suppress the specific user warning about frames=None and cache_frame_data
