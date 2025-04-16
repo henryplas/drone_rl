@@ -2,7 +2,7 @@ import numpy as np
 import gym
 from gym import spaces
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 # ---------------------------------------------------------------------------
@@ -42,7 +42,7 @@ class DroneEnv:
           - euler: [roll, pitch, yaw] angles (rad)
           - omega: [p, q, r] angular velocity (rad/s)
         """
-        self.pos = np.array([0.1, 0.1, 0.1])
+        self.pos = np.array([0.0, 0.0, 1.0])
         self.vel = np.zeros(3)
         self.euler = np.zeros(3)
         self.omega = np.zeros(3)
