@@ -1,23 +1,17 @@
-from drone import DroneGymEnv
 from stable_baselines3 import PPO
+from traj_tb import TrajectoryTensorboardCallback as CB
+from drone import DroneGymEnv
 
-# Create the Gym environment.
-env = DroneGymEnv()
+model = PPO(
+    "MlpPolicy",
+    DroneGymEnv(),
+    verbose=1,
+    tensorboard_log="./tensorboard/"        # must still point somewhere
+)
+cb = CB()  # no writer argument any more
 
-# Instantiate the PPO agent using an MLP policy.
-model = PPO("MlpPolicy", env, verbose=1, tensorboard_log="./tensorboard/")
-
-# Train for a total of 100,000 timesteps.
-model.learn(total_timesteps=10e6,  tb_log_name="first_run")
-
-# Save the trained model.
-model.save("ppo_drone")
-
-# Test the trained model.
-# obs = env.reset()
-# for i in range(300):
-#     action, _states = model.predict(obs, deterministic=True)
-#     obs, reward, done, info = env.step(action)
-#     env.render()
-#     if done:
-#         obs = env.reset()
+model.learn(
+    total_timesteps=int(1e6),
+    tb_log_name="drone_runs",
+    callback=cb
+)
