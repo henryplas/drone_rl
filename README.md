@@ -59,7 +59,7 @@ python record.py --model-path logs/ppo/model.zip --output video.mp4 --fps 20
 
 ## Project Structure
 ```plaintext
-drone-rl-simulation/
+drone_rl/
 ├── drone.py            # Custom Gym environment implementation
 ├── train.py            # Training entry point
 ├── test.py             # Video recording utility
