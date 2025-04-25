@@ -24,7 +24,7 @@ This repository contains the simulation environment and training scripts for a d
 - Support for single- and multi-environment vectorized training  
 - Pre-built PPO training and evaluation scripts  
 - TensorBoard logging and custom callbacks  
-- Video recording of rollouts (MP4/GIF)  
+- Video recording of rollouts (GIF)  
 
 ## Prerequisites
 - Python 3.8+  
