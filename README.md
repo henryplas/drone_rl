@@ -1,3 +1,5 @@
+[Alt text](images/weird_but_good.gif)
+
 # Drone Reinforcement Learning Simulation
 
 ## Overview
