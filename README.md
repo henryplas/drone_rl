@@ -42,11 +42,6 @@ This repository contains the simulation environment and training scripts for a d
    conda activate drone-rl
    ```
 
-3. Install dependencies:  
-   ```bash
-   pip install -r requirements.txt
-   ```
-
 ## Usage
 
 ### Training
