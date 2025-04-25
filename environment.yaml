@@ -1,0 +1,18 @@
+name: drone-rl
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.8
+  - numpy
+  - matplotlib
+  - pillow
+  - tqdm
+  - gym>=0.26
+  - pytorch
+  - torchvision
+  - pip
+  - pip:
+    - stable-baselines3
+    - opencv-python
+    - tensorboard
