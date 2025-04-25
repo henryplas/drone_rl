@@ -1,4 +1,6 @@
-[Alt text](images/weird_but_good.gif)
+<p align="center">
+  <img src="images/weird_but_good.gif" alt="Drone demo" width="600" height="auto" />
+</p>
 
 # Drone Reinforcement Learning Simulation
 
@@ -76,7 +78,22 @@ Contributions are welcome! Please open an issue or submit a pull request:
 2. Create a feature branch (`git checkout -b feature-name`)  
 3. Commit your changes (`git commit -m "Add new feature"`)  
 4. Push to the branch (`git push origin feature-name`)  
-5. Open a pull request  
+5. Open a pull request
+
+## Methodology
+(TODO)
+Curriculum learning steps:
+add curriculum
+added pos-target to obs
+made the target easier
+used different shaping at first
+
+
+## Future Work
+- Smoothing out flight controls.
+- Trajectory planning
+- Playing tag via Multi Agent RL
+
 
 ## License
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
