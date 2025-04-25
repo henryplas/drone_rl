@@ -9,7 +9,7 @@ class TrajectoryTensorboardCallback(BaseCallback):
     Every 3000 episodes we log three overlaid plots (XY, XZ, YZ)
     covering the last 3000 episodes, then reset the buffer.
     """
-    def __init__(self, verbose=0, record_interval: int = 100, block_size: int = 3000):
+    def __init__(self, verbose=0, record_interval: int = 25, block_size: int = 500):
         super().__init__(verbose)
         self.record_interval = record_interval
         self.block_size = block_size
@@ -29,6 +29,7 @@ class TrajectoryTensorboardCallback(BaseCallback):
         raise RuntimeError("No TensorBoardOutputFormat found in logger.")
 
     def _on_step(self) -> bool:
+
         # 1) record current position
         pos = self.training_env.get_attr('pos')[0]
         self.positions.append(np.array(pos))
@@ -42,7 +43,7 @@ class TrajectoryTensorboardCallback(BaseCallback):
             traj = np.array(self.positions[:-1])
 
             # buffer every other 100th episode: 100, 300, 500, …
-            if self.episode_count % self.record_interval == 0 and ((self.episode_count // self.record_interval) % 2 == 1):
+            if self.episode_count % self.record_interval == 0:
                 self.buffered_trajs.append(traj)
 
             # every 3000 episodes, log all buffered and reset

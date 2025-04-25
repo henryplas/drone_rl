@@ -4,12 +4,19 @@ from gym import spaces
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from matplotlib.animation import PillowWriter
+
 
 # ---------------------------------------------------------------------------
 # Drone dynamics implementation with motor force inputs
 # ---------------------------------------------------------------------------
 class DroneEnv:
     def __init__(self, dt=0.02):
+        self._fig = None
+        self._writer = None
+    
+        self.ep_num = 0
+        self.total_steps = 1
         # Drone physical parameters
         self.mass = 1.0         # kg
         self.g = 9.81           # m/s^2
@@ -17,6 +24,14 @@ class DroneEnv:
         self.I = np.array([0.005, 0.005, 0.01])
         self.dt = dt            # time step
 
+
+        self.current_step = 0
+        
+        self.add = 0
+
+
+        self.eps = 0.0
+        
         # For drawing: arm length for the X shape (distance from center to each motor)
         self.arm_length = 0.5
         
@@ -24,11 +39,8 @@ class DroneEnv:
         # Adjust this constant as needed.
         self.k_yaw = 0.01
 
-        # Desired target waypoint (for example, hover at z = 10)
-        self.target = np.array([0.0, 0.0, 10.0])
-        
-        # Maximum steps per episode (added for longer episodes)
-        self.max_steps = 1000
+         # Maximum steps per episode (added for longer episodes)
+        self.max_steps = 200
 
         # Initialize state
         self.reset()
@@ -42,16 +54,29 @@ class DroneEnv:
           - euler: [roll, pitch, yaw] angles (rad)
           - omega: [p, q, r] angular velocity (rad/s)
         """
-        self.pos = np.array([0.0, 0.0, 1.0])
+        self.pos = np.array([np.random.rand()-0.5, np.random.rand()-0.5, 1.0])
         self.vel = np.zeros(3)
         self.euler = np.zeros(3)
         self.omega = np.zeros(3)
+        self.ep_num += 1
+        # if self.ep_num % 2000 == 0 and eps < 3:
+        #     eps+=0.1
+        # self.amt = 20000 // self.current_step
+
         self.current_step = 0
+
+        if self.ep_num % 2000 == 0:
+            # self.add += 0.1
+            self.eps += 0.1
+
+
+        self.target = np.array([self.eps * np.random.rand(), self.eps * np.random.rand(), self.eps * np.random.rand() + 1.0 + self.add ])
+
         return self._get_obs()
 
     def _get_obs(self):
         """Returns the full state as a 1D numpy array."""
-        return np.concatenate([self.pos, self.vel, self.euler, self.omega]).astype(np.float32)
+        return np.concatenate([self.pos, self.vel, self.euler, self.omega, self.target-self.pos]).astype(np.float32)
 
     def step(self, action):
         """
@@ -73,6 +98,7 @@ class DroneEnv:
           done: boolean indicating termination (if drone crashes or drifts too far)
           info: additional info (empty dict)
         """
+        self.total_steps += 1
         # Interpret action as individual motor forces.
         motor_forces = action  # [F1, F2, F3, F4]
 
@@ -113,10 +139,17 @@ class DroneEnv:
         self.omega += omega_dot * self.dt
 
         # Reward: negative distance from the target (plus bonus if near target)
-        reward = 0.01 * -np.linalg.norm(self.pos - self.target) 
-        if np.linalg.norm(self.pos - self.target) < 1:
+        reward = 0.01 * -np.linalg.norm(self.pos - self.target)  
+        # if np.linalg.norm(self.pos - self.target) < 1.0:
+        #     reward += .1
+        # if np.linalg.norm(self.pos - self.target) < .25:
+        #     reward += .1
+        if np.linalg.norm(self.pos - self.target) < .05:
             reward += 1
+        # if self.current_step < 10 and np.all(motor_forces>0):
+        #     reward += 0.01
 
+        
         # Terminate if the drone "crashes" (z < 0) or drifts too far from the origin.
         done = self.pos[2] < 0 or np.linalg.norm(self.pos) > 50
         self.current_step += 1
@@ -152,22 +185,38 @@ class DroneEnv:
         ])
         return T @ omega
 
+
+    def start_record(self, filename='drone_run.mp4', dpi=200, fps=20, bitrate=-1):
+        """
+        Call before your loop to start video recording.
+        Requires ffmpeg on your PATH.
+        """
+        if self._fig is None:
+            self._fig = plt.figure()
+        self._writer = PillowWriter(fps=fps)
+        self._writer.setup(self._fig, filename, dpi)
+
+    def stop_record(self):
+        """Call after your loop to finish & save the video."""
+        if self._writer:
+            self._writer.finish()
+            self._writer = None
+
     def render(self, ax=None):
         """
         Renders a 3D visualization of the drone.
-        The drone is drawn as an “X” shape formed by two lines connecting opposite motors.
+        If recording, each frame is grabbed into the video.
         """
+        # create figure & ax if needed
         if ax is None:
-            fig = plt.figure()
-            ax = fig.add_subplot(111, projection='3d')
-        
+            if self._fig is None:
+                self._fig = plt.figure()
+            ax = self._fig.add_subplot(111, projection='3d')
+
         ax.clear()
-        # Plot the target waypoint.
+        # — your existing plotting code —
         ax.scatter(self.target[0], self.target[1], self.target[2],
                    color='green', s=50, label='Target')
-        
-        # Compute motor positions in the drone's body frame.
-        # Motors are arranged at 45°, 135°, 225°, and 315°.
         arm = self.arm_length
         motor_offsets = np.array([
             [ arm/np.sqrt(2),  arm/np.sqrt(2), 0],
@@ -175,35 +224,30 @@ class DroneEnv:
             [-arm/np.sqrt(2), -arm/np.sqrt(2), 0],
             [ arm/np.sqrt(2), -arm/np.sqrt(2), 0]
         ])
-        # Rotate motor positions to the inertial frame.
         R = self._rotation_matrix(self.euler)
-        motors_inertial = self.pos + (R @ motor_offsets.T).T  # shape (4,3)
-        
-        # Draw two lines forming an X: one between motor 0 and 2, and one between motor 1 and 3.
-        ax.plot([motors_inertial[0, 0], motors_inertial[2, 0]],
-                [motors_inertial[0, 1], motors_inertial[2, 1]],
-                [motors_inertial[0, 2], motors_inertial[2, 2]],
-                color='purple', linewidth=2)
-        ax.plot([motors_inertial[1, 0], motors_inertial[3, 0]],
-                [motors_inertial[1, 1], motors_inertial[3, 1]],
-                [motors_inertial[1, 2], motors_inertial[3, 2]],
-                color='purple', linewidth=2)
-        
-        # Optionally, plot the drone center and motor positions.
+        motors = self.pos + (R @ motor_offsets.T).T
+        ax.plot([motors[0,0], motors[2,0]],
+                [motors[0,1], motors[2,1]],
+                [motors[0,2], motors[2,2]], color='purple', lw=2)
+        ax.plot([motors[1,0], motors[3,0]],
+                [motors[1,1], motors[3,1]],
+                [motors[1,2], motors[3,2]], color='purple', lw=2)
         ax.scatter(self.pos[0], self.pos[1], self.pos[2],
                    color='red', s=20, label='Center')
-        ax.scatter(motors_inertial[:, 0], motors_inertial[:, 1], motors_inertial[:, 2],
+        ax.scatter(motors[:,0], motors[:,1], motors[:,2],
                    color='blue', s=20, label='Motors')
-        
-        ax.set_xlim([-20, 20])
-        ax.set_ylim([-20, 20])
-        ax.set_zlim([0, 20])
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
-        plt.draw()
-        plt.pause(0.001)
+        ax.set_xlim(-5,5); ax.set_ylim(-5,5); ax.set_zlim(0,5)
+        ax.set_xlabel('X'); ax.set_ylabel('Y'); ax.set_zlabel('Z')
 
+        plt.draw()
+        if self._writer:
+            # grab this frame for the video
+            self._writer.grab_frame()
+        else:
+            # normal live-render
+            plt.pause(0.001)
+
+             
 # ---------------------------------------------------------------------------
 # Gym-compatible environment wrapping the DroneEnv
 # ---------------------------------------------------------------------------
@@ -212,7 +256,7 @@ class DroneGymEnv(DroneEnv, gym.Env):
         DroneEnv.__init__(self, dt)
         gym.Env.__init__(self)
         # Observation: [pos(3), vel(3), euler(3), omega(3)]
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(12,), dtype=np.float32)
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(15,), dtype=np.float32)
         # Action: now each element is the force from each motor.
         # For this example, we assume each motor's force is between 0 and 3*mass*g/4,
         # so that the maximum total force is 3*mass*g.
@@ -220,6 +264,7 @@ class DroneGymEnv(DroneEnv, gym.Env):
         self.action_space = spaces.Box(low=0, high=motor_max, shape=(4,), dtype=np.float32)
 
     def step(self, action):
+
         return super().step(action)
 
     def reset(self):
