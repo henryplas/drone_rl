@@ -9,7 +9,6 @@ This repository contains the simulation environment and training scripts for a d
 - [Installation](#installation)  
 - [Usage](#usage)  
   - [Training](#training)  
-  - [Evaluation](#evaluation)  
   - [Recording Video](#recording-video)  
 - [Project Structure](#project-structure)  
 - [Contributing](#contributing)  
@@ -50,12 +49,6 @@ This repository contains the simulation environment and training scripts for a d
 Run the main training script using PPO:  
 ```bash
 python train.py 
-```
-
-### Evaluation
-Evaluate a trained model on a few episodes:  
-```bash
-python evaluate.py --model-path logs/ppo/model.zip --episodes 10
 ```
 
 ### Recording Video
