@@ -54,7 +54,7 @@ python train.py
 ### Recording Video
 To record rollouts to an MP4:  
 ```bash
-python record.py --model-path logs/ppo/model.zip --output video.mp4 --fps 20
+python test.py
 ```
 
 ## Project Structure
